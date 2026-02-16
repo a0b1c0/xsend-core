@@ -44,9 +44,9 @@ const t = ui[lang as keyof typeof ui] || ui[defaultLang];
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid md:grid-cols-3 gap-8">
           {[
-            { title: t['features.secure'], icon: '🛡️', desc: 'ChaCha20Poly1305 encryption assures your data is for your eyes only.' },
-            { title: t['features.fast'], icon: '⚡', desc: 'Saturates your LAN bandwidth. No cloud bottlenecks.' },
-            { title: t['features.private'], icon: '🔒', desc: 'Direct P2P connection. We never see your files.' },
+            { title: t['features.secure'], icon: 'SECURE', desc: 'ChaCha20Poly1305 encryption assures your data is for your eyes only.' },
+            { title: t['features.fast'], icon: 'FAST', desc: 'Saturates your LAN bandwidth. No cloud bottlenecks.' },
+            { title: t['features.private'], icon: 'PRIVATE', desc: 'Direct P2P connection. We never see your files.' },
           ].map(f => (
             <div class="p-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
               <div class="text-4xl mb-4">{f.icon}</div>

@@ -46,7 +46,7 @@ const englishUi = {
     'features.secure': 'End-to-End Encryption',
     'features.fast': 'Blazing Fast LAN Speed',
     'features.private': 'No Cloud Storage',
-    'footer.copyright': '© 2026 xSend. Open Source.',
+    'footer.copyright': 'Copyright 2026 xSend. Open Source.',
 } as const;
 
 type UiMap = Record<keyof typeof languages, typeof englishUi>;
