@@ -1,16 +1,16 @@
 {
     "questions": [
         {
-            "q": "xSend 是完全免费的吗？",
-            "a": "是的，核心 P2P 功能完全开源且免费。可选的云端中继服务为小文件提供免费层级。"
+            "q": "Is xSend completely free?",
+            "a": "Yes, the core P2P functionality is open source and free. The optional Cloud Relay service has a free tier for small files."
         },
         {
-            "q": "xSend 会存储我的文件吗？",
-            "a": "不会。在直连模式（LAN）下，文件直接从设备 A 传输到设备 B，我们永远看不到它们。如果您使用云端中继，文件会被暂时缓存（加密）并在 7 天后删除。"
+            "q": "Does xSend store my files?",
+            "a": "No. In Direct Mode (LAN), files go directly from device A to device B. We never see them. If you use Cloud Relay, files are temporarily cached (encrypted) and deleted after 7 days."
         },
         {
-            "q": "支持哪些平台？",
-            "a": "完美支持 Windows, macOS 和 Linux。Android 和 iOS 目前支持通过 Web 界面访问。"
+            "q": "What platforms are supported?",
+            "a": "Windows, macOS, and Linux are fully supported. Android and iOS support is currently available via the web interface."
         }
     ]
 }

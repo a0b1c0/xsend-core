@@ -1,4 +1,4 @@
-# Rust 跨平台文件传输系统
+# Rust Cross-Platform File Transfer System
 
 ## Architecture Spec v3.2 (Implemented Baseline + Gap List)
 
@@ -6,116 +6,116 @@ Updated: 2026-02-16
 
 --------------------------------------------------------------------------
 
-## 1. 文档定位
+## 1. Document Scope
 
-本版本不是“理想目标清单”，而是“当前代码实现基线”。  
-目标是让设计文档与仓库现状一致，并明确未完成项。
-
---------------------------------------------------------------------------
-
-## 2. 当前总体架构（已落地）
-
-- 核心语言：Rust
-- 本地常驻服务：`xsend` daemon
-- 本地 UI：localhost Web UI（由 daemon 提供）
-- 桌面封装：Tauri 2.0（启动 daemon 并内嵌 WebView）
-- 云中转：Cloudflare Worker + Durable Objects + R2 + D1
-
-关键边界：
-
-- 控制面 HTTP：仅监听 `127.0.0.1` 随机端口
-- 局域网数据面 TCP：监听 `0.0.0.0` 随机端口（用于 LAN 文件直连）
+This version is not an idealized target list. It is the implementation baseline reflected by the current repository.
+The purpose is to keep the design document aligned with shipped code and to make open gaps explicit.
 
 --------------------------------------------------------------------------
 
-## 3. 传输路径状态（按真实实现）
+## 2. Current System Architecture (Implemented)
 
-已实现：
+- Core language: Rust
+- Local resident service: `xsend` daemon
+- Local UI: localhost Web UI (served by daemon)
+- Desktop wrapper: Tauri 2.0 (starts daemon and embeds WebView)
+- Cloud relay: Cloudflare Worker + Durable Objects + R2 + D1
 
-- LAN 直连（自定义 TCP 协议）
-- WAN 直连（QUIC 数据面）
-- 云中转（R2 Relay，登录用户专属频道）
-- Relay 文件端到端加密（本地加密上传，本地解密下载）
-- 自动路由基础编排：`LAN -> WAN`，失败后可自动回落 Relay（需登录 token）
-- 浏览器 Auto-Discovery 信令后端基线（Worker `SignalAutoDO` + WebSocket）
-- 浏览器 Auto-Discovery 前端（无需登录设备发现 + WebRTC DataChannel 文件传输）
-- 浏览器 Offline Mode 基线（offer/answer code、二维码生成/扫码、离线壳）
+Key boundaries:
 
-未实现：
-
-- TURN 作为文件数据面中继传输
-- TURN 参与的数据面自动选路（当前仅支持 TURN 预检 + credentials）
-- 离线码压缩/分片与指纹确认（当前为基线实现）
-
-说明：
-
-- 当前 TURN 仍未接入实际文件流。
-- `send_by_code` 已支持直连失败后的后台自动 Relay 回落（`x-relay-auto-on-fail`）。
+- Control plane HTTP: listens only on `127.0.0.1` random port
+- LAN data plane TCP: listens on `0.0.0.0` random port (for direct LAN transfer)
 
 --------------------------------------------------------------------------
 
-## 4. 加密与安全（当前）
+## 3. Transfer Path Status (By Actual Implementation)
 
-LAN 传输：
+Implemented:
 
-- X25519 密钥交换
-- HKDF-SHA256 派生会话密钥
-- ChaCha20-Poly1305 加密数据帧
-- chunk BLAKE3 + final file BLAKE3 校验
+- LAN direct transfer (custom TCP protocol)
+- WAN direct transfer (QUIC data plane)
+- Cloud relay (R2 relay channel per authenticated user)
+- Relay file end-to-end encryption (local encrypt upload, local decrypt download)
+- Baseline auto-routing: `LAN -> WAN`, with automatic Relay fallback on failure (requires auth token)
+- Browser auto-discovery signaling backend baseline (Worker `SignalAutoDO` + WebSocket)
+- Browser auto-discovery frontend (no-login peer discovery + WebRTC DataChannel transfer)
+- Browser Offline Mode baseline (offer/answer code, QR generate/scan, offline shell)
 
-Relay 传输：
+Not yet implemented:
 
-- 每个 relay channel 本地维护 32-byte 文件密钥
-- 文件加密封装头：`XSR1`
-- 文件加密：ChaCha20-Poly1305
-- 设备配对：X25519 + HKDF + ChaCha20-Poly1305 包裹文件密钥
+- TURN as an actual file data-plane relay
+- TURN-integrated automatic data-plane routing (currently TURN preflight + credentials only)
+- Offline-code compression/chunking and fingerprint confirmation were baseline only and later expanded
 
-本地控制面安全：
+Notes:
 
-- daemon 启动时生成 admin token
-- UI 首次访问自动下发 HttpOnly cookie
-- API 需 admin token（Bearer 或 cookie）
-- Origin 白名单校验
-
---------------------------------------------------------------------------
-
-## 5. 免费用户策略（当前生效）
-
-Relay（R2 中转站）限制：
-
-- 最大文件数：5
-- 单文件上限：10 MiB
-- 总存储上限：50 MiB
-- 保留时间：7 天
-- 文件类型：不限
-
-清理机制：
-
-- Durable Object `alarm()` 定时清理
-- 访问时惰性清理
-- 过期对象和元数据同步删除
+- TURN is still not carrying real file streams in the current core daemon pipeline.
+- `send_by_code` already supports automatic background Relay fallback after direct-transfer failure (`x-relay-auto-on-fail`).
 
 --------------------------------------------------------------------------
 
-## 6. 账号与登录（当前）
+## 4. Cryptography and Security (Current)
 
-已实现：
+LAN transfer:
 
-- 用户名/密码注册登录
-- 用户登录后无需手动输入 relay code（`/api/v1/me/channel` 自动分配）
-- `clients.client_type` 写入/补齐为 `xsend`
+- X25519 key exchange
+- HKDF-SHA256 session key derivation
+- ChaCha20-Poly1305 encrypted data frames
+- Per-chunk BLAKE3 + final file BLAKE3 verification
 
-OAuth 代码状态：
+Relay transfer:
 
-- Google：代码已实现，当前环境已配置
-- GitHub：代码已实现，当前环境未配置
-- Apple：代码已实现，当前环境未配置
+- 32-byte local file key maintained per relay channel
+- Encrypted file envelope header: `XSR1`
+- File encryption: ChaCha20-Poly1305
+- Device pairing: X25519 + HKDF + ChaCha20-Poly1305 wrapping of file key
+
+Local control plane security:
+
+- Admin token generated at daemon startup
+- HttpOnly cookie auto-issued on first UI access
+- API requires admin token (Bearer or cookie)
+- Origin allowlist validation
 
 --------------------------------------------------------------------------
 
-## 7. API 现状摘要
+## 5. Free-Tier Policy (Current)
 
-daemon 本地 API（节选）：
+Relay (R2 station) limits:
+
+- Max file count: 5
+- Max single file size: 10 MiB
+- Max total storage: 50 MiB
+- Retention: 7 days
+- File type: unrestricted
+
+Cleanup mechanism:
+
+- Durable Object timed cleanup via `alarm()`
+- Lazy cleanup on access
+- Expired object and metadata deletion in sync
+
+--------------------------------------------------------------------------
+
+## 6. Account and Login (Current)
+
+Implemented:
+
+- Username/password registration and login
+- Logged-in users do not need manual relay code input (`/api/v1/me/channel` auto-assigned)
+- `clients.client_type` written/backfilled as `xsend`
+
+OAuth code status:
+
+- Google: implemented; configured in current environment
+- GitHub: implemented; not configured in current environment
+- Apple: implemented; not configured in current environment
+
+--------------------------------------------------------------------------
+
+## 7. API Status Summary
+
+daemon local APIs (subset):
 
 - `GET /api/v1/info`
 - `POST /api/v1/sessions/receive`
@@ -128,7 +128,7 @@ daemon 本地 API（节选）：
 - `POST /api/v1/relay/e2ee/pair/:code/send`
 - `POST /api/v1/relay/e2ee/pair/:code/accept`
 
-worker 云 API（节选）：
+worker cloud APIs (subset):
 
 - `POST /api/v1/auth/register`
 - `POST /api/v1/auth/login`
@@ -155,58 +155,58 @@ worker 云 API（节选）：
 
 --------------------------------------------------------------------------
 
-## 8. 完成度清单
+## 8. Completion Checklist
 
-已完成：
+Completed:
 
-- 本地 daemon 随机端口启动与 UI 自动连接
-- 6 位码接收与 LAN 自动发现发送（`send_by_code`）
-- WAN QUIC 发送链路（`/api/v1/transfers/send_wan`）
-- `send_by_code` 路由顺序 `LAN -> WAN`，失败后自动回落 Relay（可配置）
-- Relay 登录态上传下载（无需手动 code）
-- Relay 免费额度与 7 天自动清理
-- Relay E2EE 配对与加解密文件流
-- TURN 凭证签发接口接通
-- 基于 `client_type/plan` 的配额分层解析（free/pro）
-- 每日/每月用量计量与账单估算 API（`/api/v1/me/billing`）及 UI 展示
-- Stripe 结算基础闭环（Checkout + Webhook 验签 + 订阅/发票入库）
-- Stripe 增强账单闭环（Billing Portal、订阅取消/恢复、退款/争议入库、月度对账报表导出）
-- E2EE 上传密文开销通道（`x-xsend-e2ee` + 可配置 overhead）与动态配额预检查
-- Relay 目录批量上传与频道批量拉取（含相对目录结构保真落盘）
-- D1 迁移序列扩展（`0001`~`0004`）与一键迁移脚本（`scripts/apply-migrations.sh`）
-- 发送任务崩溃恢复（daemon 重启后自动恢复未完成 send/send_wan/send_by_code 任务）
-- 基础可观测性（`/api/v1/metrics` Prometheus 文本指标 + 关键链路计数器）
-- Feature gate 基线（按 plan 返回 features，支持 `TURN_REQUIRE_PAID` 对 TURN 凭证按付费分层）
-- 浏览器双模式页面（Auto-Discovery + Offline Mode）及本地收发文件闭环
-- Service Worker 离线缓存壳（首轮在线加载后可离线复用页面）
-- Tauri 2.0 桌面壳工程
+- Local daemon startup on random port with automatic UI attach
+- 6-digit receive code and LAN auto-discovery send flow (`send_by_code`)
+- WAN QUIC send path (`/api/v1/transfers/send_wan`)
+- `send_by_code` route order `LAN -> WAN`, with automatic Relay fallback on failure (configurable)
+- Relay authenticated upload/download without manual code
+- Relay free-tier quotas and 7-day auto cleanup
+- Relay E2EE pairing and encrypted/decrypted file stream support
+- TURN credentials API available
+- Quota tier parsing by `client_type/plan` (free/pro)
+- Daily/monthly usage metering and billing estimate API (`/api/v1/me/billing`) with UI surface
+- Stripe baseline billing loop (Checkout + webhook signature verification + subscription/invoice persistence)
+- Stripe enhanced billing loop (Billing Portal, subscription cancel/resume, refund/dispute persistence, monthly reconciliation export)
+- E2EE upload ciphertext overhead channel (`x-xsend-e2ee` + configurable overhead) with dynamic quota precheck
+- Relay directory batch upload and channel batch pull (relative directory structure preserved)
+- D1 migration sequence extension (`0001` to `0004`) and one-step migration script (`scripts/apply-migrations.sh`)
+- Crash recovery for send tasks (daemon restart auto-recovers unfinished send/send_wan/send_by_code tasks)
+- Baseline observability (`/api/v1/metrics` Prometheus text metrics + key flow counters)
+- Feature gate baseline (plan-based features, supports `TURN_REQUIRE_PAID` for paid TURN credentials gating)
+- Browser dual-mode page (Auto-Discovery + Offline Mode) with end-to-end local send/receive loop
+- Service Worker offline shell (reusable after first online load)
+- Tauri 2.0 desktop shell project
 
-本轮已补齐（基线）：
+Completed in the latest baseline pass:
 
-- TURN 数据通道接入（浏览器 Auto-Discovery 增加强制 TURN relay ICE 重拨）
-- 自动路由补齐为 `P2P -> TURN -> Relay`（TURN 失败时自动 Relay 回退）
-- 双模式安全增强（连接指纹确认、离线码压缩分片与二维码分片拼装）
-- 免费/付费能力分层下沉到功能级（upload/download/e2ee/batch/auto-discovery/offline 等 feature gate）
-- 可观测性增强（自动路由维度指标 + 结构化路由日志）
+- TURN data-channel integration at browser layer (Auto-Discovery adds forced TURN relay-ICE redial path)
+- Unified automatic route fallback to `P2P -> TURN -> Relay` (Relay fallback when TURN fails)
+- Dual-mode security enhancements (connection fingerprint confirmation, offline code compression/chunking, QR fragment assembly)
+- Free/paid capability gating down to feature level (upload/download/e2ee/batch/auto-discovery/offline)
+- Observability enhancement (auto-route dimension metrics + structured route logs)
 
 --------------------------------------------------------------------------
 
-## 9. 下一阶段实施顺序（建议，非阻塞优化）
+## 9. Suggested Next Phase Order (Non-Blocking Enhancements)
 
-P0：
+P0:
 
-- TURN 通道稳定性压测（复杂 NAT、移动网络切换）
+- TURN channel stability stress tests (complex NAT, mobile network switching)
 
-P1：
+P1:
 
-- 完成税务精细化能力（多税率/地区规则）与争议自动化处置策略
-- 完成 GitHub/Apple 生产配置与回调校验
+- Complete tax granularity (multi-rate/region rules) and dispute automation strategy
+- Complete GitHub/Apple production configuration and callback validation
 
-P2：
+P2:
 
-- 增强崩溃恢复与跨重启续传
-- 补齐文件夹模式与批量任务体验
-- 加入观测面板、日志聚合与告警策略
+- Stronger crash recovery and cross-restart resume behavior
+- Full folder-mode and batch-task UX completion
+- Add dashboards, log aggregation, and alerting strategy
 
 --------------------------------------------------------------------------
 

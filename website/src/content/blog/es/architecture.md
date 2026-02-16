@@ -1,32 +1,42 @@
 ---
-title: "La Arquitectura de un Sistema de Transferencia de Archivos P2P Seguro"
-description: "Profundizando en cómo xSend utiliza Rust, Tokio y X25519 para ofrecer transferencias de archivos seguras y de alto rendimiento."
-pubDate: 2026-02-15
-tags: ["rust", "p2p", "seguridad", "arquitectura"]
+title: "The Architecture of a Secure P2P File Transfer System"
+description: "Deep dive into how xSend uses Rust, Tokio, and X25519 to deliver secure, high-performance file transfers."
+pubDate: 2026-02-14
+author: "xSend Team"
+tags: ["tech", "rust", "p2p"]
 ---
 
-## Introducción
+## Introduction
 
-En una era donde domina el almacenamiento en la nube, enviar un archivo a la persona sentada a tu lado a menudo implica subirlo a un servidor al otro lado del mundo, solo para descargarlo de nuevo. Esto es ineficiente y menos privado.
+In an era where cloud storage has become the default for file sharing, privacy and speed often take a back seat. We built **xSend** to challenge this status quo.
 
-xSend resuelve esto creando un túnel directo y cifrado entre dispositivos.
+**xSend** is a cross-platform, P2P file transfer tool written in Rust. It allows you to transfer files directly between devices without any intermediate server, ensuring maximum privacy and LAN-speed performance.
 
-## La Tecnología Principal
+## The Problem with Cloud Transfer
 
-Elegimos **Rust** por su seguridad de memoria y rendimiento sin recolector de basura. El tiempo de ejecución asíncrono es proporcionado por **Tokio**, lo que nos permite manejar miles de conexiones concurrentes con un uso mínimo de recursos.
+1.  **Privacy**: Your files live on someone else's computer.
+2.  **Speed**: Uploading to the cloud and then downloading is twice the bandwidth usage.
+3.  **Limits**: File size limits and storage quotas.
 
-### Apretón de Manos de Cifrado (Encryption Handshake)
+**xSend** solves this by creating a direct, encrypted tunnel between devices.
 
-Cada sesión comienza con un intercambio de claves **X25519**. Este apretón de manos Diffie-Hellman asegura que se establezca un secreto compartido sin transmitirlo nunca por la red. De este secreto compartido, derivamos claves de sesión usando **HKDF-SHA256**.
+## Core Technology
 
-Todo el tráfico posterior se cifra utilizando **ChaCha20Poly1305**, un cifrado autenticado de alto rendimiento que funciona eficientemente incluso en procesadores móviles.
+### 1. Rust & Tokio
 
-## Descubrimiento vía UDP
+We chose Rust for its memory safety and performance. The core daemon is built on top of **Tokio**, an asynchronous runtime that allows us to handle thousands of concurrent connections with minimal resource usage.
 
-Para evitar la entrada manual de IP, xSend transmite paquetes de presencia en el puerto UDP `49872`. Cuando un par recibe este paquete, puede iniciar una conexión TCP al puerto anunciado por el remitente.
+### 2. X25519 & ChaCha20-Poly1305
 
-> Nota: Esto solo funciona dentro de la misma subred. Para transferencias WAN, estamos introduciendo un servidor Relay.
+Security is not an afterthought. Every transfer is authenticated and encrypted:
 
-## Conclusión
+*   **Key Exchange**: X25519 (Elliptic Curve Diffie-Hellman)
+*   **Encryption**: ChaCha20-Poly1305 (Authenticated Encryption)
 
-Al aprovechar la criptografía moderna y la programación de sistemas, xSend proporciona una herramienta que es tanto simple de usar como matemáticamente segura.
+### 3. Local Discovery
+
+To avoid manual IP entry, **xSend** broadcasts presence packets on UDP port `49872`. When a peer receives this packet, it can initiate a TCP connection to the sender's advertised port.
+
+## Conclusion
+
+By leveraging modern cryptography and systems programming, **xSend** provides a tool that is both simple to use and mathematically secure.
