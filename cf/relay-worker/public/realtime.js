@@ -4,7 +4,6 @@
   const CHUNK_BYTES = 64 * 1024;
   const SEND_BUFFER_LIMIT = CHUNK_BYTES * 8;
   const AUTO_RECONNECT_MS = 2000;
-  const AUTO_REDIAL_MS = 700;
   const OFFLINE_ICE_GATHER_MS = 900;
   const WASM_INIT_TIMEOUT_MS = 5000;
   const PAKO_INIT_TIMEOUT_MS = 5000;
@@ -18,6 +17,9 @@
   const CODE_SHARD_MAX_PARTS = 24;
   const AUTO_CONNECT_WAIT_MS = 7000;
   const AUTO_CONNECT_WAIT_TURN_MS = 9000;
+  const AUTH_REQUEST_TTL_MS = 90 * 1000;
+  const AUTH_GRANT_TTL_MS = 2 * 60 * 1000;
+  const AUTH_OTP_TTL_MS = 2 * 60 * 1000;
 
   function $(id) {
     return document.getElementById(id);
@@ -79,6 +81,11 @@
 
   function randomTransferId() {
     return randomHex(8);
+  }
+
+  function randomOtp6() {
+    const n = Math.floor(Math.random() * 1_000_000);
+    return String(n).padStart(6, "0");
   }
 
   function defaultDeviceName() {
@@ -529,12 +536,14 @@
       running: false,
       ws: null,
       reconnectTimer: null,
-      redialTimers: new Map(),
       peers: new Map(),
       sessions: new Map(),
       selfId: null,
       selectedPeerId: null,
       iceServers: null,
+      pendingRequests: new Map(),
+      authGrants: new Map(),
+      otpChallenges: new Map(),
     },
 
     offline: {
@@ -779,6 +788,84 @@
     return session.pc.connectionState || session.pc.iceConnectionState || "new";
   }
 
+  function purgeAutoAuthState() {
+    const now = Date.now();
+    for (const [peerId, req] of state.auto.pendingRequests.entries()) {
+      if (!req || now - Number(req.createdAtMs || 0) > AUTH_REQUEST_TTL_MS) {
+        state.auto.pendingRequests.delete(peerId);
+      }
+    }
+    for (const [peerId, grant] of state.auto.authGrants.entries()) {
+      if (!grant || now >= Number(grant.expiresAtMs || 0)) {
+        state.auto.authGrants.delete(peerId);
+      }
+    }
+    for (const [peerId, otp] of state.auto.otpChallenges.entries()) {
+      if (!otp || now >= Number(otp.expiresAtMs || 0)) {
+        state.auto.otpChallenges.delete(peerId);
+      }
+    }
+  }
+
+  function getPendingRequest(peerId) {
+    purgeAutoAuthState();
+    return state.auto.pendingRequests.get(peerId) || null;
+  }
+
+  function getPeerGrant(peerId) {
+    purgeAutoAuthState();
+    return state.auto.authGrants.get(peerId) || null;
+  }
+
+  function hasPeerGrant(peerId) {
+    return !!getPeerGrant(peerId);
+  }
+
+  function grantPeerAuthorization(peerId, requestId, mode) {
+    state.auto.authGrants.set(peerId, {
+      requestId: String(requestId || ""),
+      mode: mode === "otp" ? "otp" : "allow",
+      grantedAtMs: Date.now(),
+      expiresAtMs: Date.now() + AUTH_GRANT_TTL_MS,
+    });
+    state.auto.otpChallenges.delete(peerId);
+  }
+
+  function clearPeerAuthorizationState(peerId) {
+    state.auto.pendingRequests.delete(peerId);
+    state.auto.authGrants.delete(peerId);
+    state.auto.otpChallenges.delete(peerId);
+  }
+
+  function peerAuthStateLabel(peerId) {
+    if (hasPeerGrant(peerId)) {
+      const grant = getPeerGrant(peerId);
+      return `authorized (${grant.mode})`;
+    }
+    const pending = getPendingRequest(peerId);
+    if (pending) {
+      return pending.waitingOtp ? "pending (waiting otp)" : "pending (waiting approval)";
+    }
+    const otp = state.auto.otpChallenges.get(peerId);
+    if (otp) {
+      return "otp generated";
+    }
+    return "authorization required";
+  }
+
+  function reconcileAuthWithPeerList() {
+    const known = new Set(state.auto.peers.keys());
+    for (const peerId of state.auto.pendingRequests.keys()) {
+      if (!known.has(peerId)) state.auto.pendingRequests.delete(peerId);
+    }
+    for (const peerId of state.auto.authGrants.keys()) {
+      if (!known.has(peerId)) state.auto.authGrants.delete(peerId);
+    }
+    for (const peerId of state.auto.otpChallenges.keys()) {
+      if (!known.has(peerId)) state.auto.otpChallenges.delete(peerId);
+    }
+  }
+
   function classifyCandidateAddress(ipLike) {
     const raw = String(ipLike || "").trim().toLowerCase();
     if (!raw) return "unknown";
@@ -940,7 +1027,8 @@
       const fpText = sess
         ? fingerprintSummary(sess.fpLocal, sess.fpRemote, !!sess.fpConfirmed)
         : "fp: -";
-      line2.textContent = `state: ${stateText} | route: ${transportText} | ${fpText}`;
+      const authText = peerAuthStateLabel(peer.id);
+      line2.textContent = `state: ${stateText} | auth: ${authText} | route: ${transportText} | ${fpText}`;
 
       const actions = document.createElement("div");
       actions.style.display = "flex";
@@ -953,14 +1041,14 @@
 
       const con = document.createElement("button");
       con.className = "primary";
-      con.textContent = "Connect";
+      con.textContent = "Request";
       con.onclick = async () => {
         setRtErr("");
         setSelectedPeer(peer.id);
         try {
-          await connectAutoPeer(peer.id, true);
+          await requestAutoConnect(peer.id, { forceRelay: false });
         } catch (e) {
-          setRtErr(e && e.message ? e.message : "connect failed");
+          setRtErr(e && e.message ? e.message : "request failed");
         }
       };
 
@@ -1061,15 +1149,9 @@
       if (st === "connected") {
         detectSessionTransport(session).then(() => renderPeers());
       }
-      if (st === "failed" || st === "closed") {
-        if (!session.turnForced) {
-          closeAutoSession(peerId, true);
-          setRtStatus(`p2p failed with ${peerId.slice(0, 8)}; retry via TURN`);
-          scheduleAutoRedial(peerId, AUTO_REDIAL_MS, true);
-        } else {
-          closeAutoSession(peerId, true);
-          setRtStatus(`TURN failed with ${peerId.slice(0, 8)}; relay fallback available`);
-        }
+      if (st === "failed" || st === "closed" || st === "disconnected") {
+        closeAutoSession(peerId, true);
+        setRtStatus(`session ended with ${peerId.slice(0, 8)}; request authorization again before reconnect`);
       }
       renderPeers();
     };
@@ -1103,6 +1185,7 @@
       }
       state.auto.sessions.delete(peerId);
     }
+    clearPeerAuthorizationState(peerId);
 
     if (!keepPeer) {
       state.auto.peers.delete(peerId);
@@ -1112,27 +1195,14 @@
     renderPeers();
   }
 
-  function scheduleAutoRedial(peerId, delayMs, forceRelay) {
-    if (!state.auto.running || state.mode !== "auto") return;
-    if (state.auto.redialTimers.has(peerId)) return;
-    const t = setTimeout(() => {
-      state.auto.redialTimers.delete(peerId);
-      connectAutoPeer(peerId, false, { forceRelay: !!forceRelay }).catch(() => {
-        // ignore redial errors; manual connect remains available.
-      });
-    }, Math.max(100, Number(delayMs) || AUTO_REDIAL_MS));
-    state.auto.redialTimers.set(peerId, t);
-  }
-
   function closeAllAutoSessions() {
     const ids = Array.from(state.auto.sessions.keys());
     for (const id of ids) {
       closeAutoSession(id, true);
     }
-    for (const t of state.auto.redialTimers.values()) {
-      clearTimeout(t);
-    }
-    state.auto.redialTimers.clear();
+    state.auto.pendingRequests.clear();
+    state.auto.authGrants.clear();
+    state.auto.otpChallenges.clear();
   }
 
   async function waitChannelDrain(dc) {
@@ -1221,9 +1291,6 @@
       setRtErr(
         `data channel error (${session.peerId.slice(0, 8)}), pc=${pc.connectionState}/${pc.iceConnectionState}, sig=${pc.signalingState}`,
       );
-      if (pc.connectionState !== "connected") {
-        scheduleAutoRedial(session.peerId, AUTO_REDIAL_MS, session.turnForced);
-      }
     };
 
     channel.onmessage = async (evt) => {
@@ -1310,6 +1377,203 @@
     );
   }
 
+  function parseSignalRequestId(payload) {
+    const raw = payload && typeof payload.request_id === "string" ? payload.request_id.trim() : "";
+    return raw || "";
+  }
+
+  function parseOtpCode(raw) {
+    const v = String(raw || "").trim();
+    return /^\d{6}$/.test(v) ? v : "";
+  }
+
+  function hasRtcAuthorization(peerId) {
+    if (hasPeerGrant(peerId)) return true;
+    const session = getSession(peerId);
+    return !!session;
+  }
+
+  async function requestAutoConnect(peerId, opts) {
+    if (!peerId) throw new Error("select a peer first");
+    if (!state.auto.running) throw new Error("auto-discovery is not running");
+    purgeAutoAuthState();
+
+    if (hasPeerGrant(peerId)) {
+      setRtStatus(`already authorized by ${peerId.slice(0, 8)}; establishing session`);
+      await connectAutoPeer(peerId, false, opts);
+      return;
+    }
+
+    const existing = getPendingRequest(peerId);
+    if (existing) {
+      setRtStatus(`authorization request already pending for ${peerId.slice(0, 8)}`);
+      renderPeers();
+      return;
+    }
+
+    const requestId = randomTransferId();
+    state.auto.pendingRequests.set(peerId, {
+      requestId,
+      createdAtMs: Date.now(),
+      waitingOtp: false,
+      forceRelay: !!(opts && opts.forceRelay),
+    });
+    sendAutoSignal(peerId, "connect_request", {
+      request_id: requestId,
+      from_name: state.peerName || null,
+    });
+    setRtStatus(`connection request sent to ${peerId.slice(0, 8)}; waiting for authorization`);
+    renderPeers();
+  }
+
+  function denyConnectRequest(toPeerId, requestId, reason) {
+    sendAutoSignal(toPeerId, "connect_reject", {
+      request_id: String(requestId || ""),
+      reason: String(reason || "rejected"),
+    });
+  }
+
+  function promptIncomingAuthorization(peerLabel) {
+    const allowNow = window.confirm(
+      [
+        `Connection request from ${peerLabel}.`,
+        "",
+        "Click OK to allow immediately.",
+        "Click Cancel to choose OTP or reject.",
+      ].join("\n"),
+    );
+    if (allowNow) return "ALLOW";
+
+    const input = window.prompt(
+      [
+        `Connection request from ${peerLabel}.`,
+        "",
+        "Type OTP to generate a one-time 6-digit code.",
+        "Type DENY to reject.",
+      ].join("\n"),
+      "OTP",
+    );
+    const action = String(input || "").trim().toUpperCase();
+    if (action === "OTP" || action === "DENY") return action;
+    return "DENY";
+  }
+
+  async function handleIncomingConnectRequest(from, payload) {
+    const requestId = parseSignalRequestId(payload);
+    if (!requestId) return;
+    const peer = state.auto.peers.get(from);
+    const label = peerDisplayName(peer);
+    const action = promptIncomingAuthorization(label);
+
+    if (action === "ALLOW") {
+      grantPeerAuthorization(from, requestId, "allow");
+      sendAutoSignal(from, "connect_grant", { request_id: requestId, mode: "allow" });
+      setRtStatus(`authorization granted to ${label}; waiting for offer`);
+      renderPeers();
+      return;
+    }
+
+    if (action === "OTP") {
+      const otp = randomOtp6();
+      state.auto.otpChallenges.set(from, {
+        requestId,
+        otp,
+        createdAtMs: Date.now(),
+        expiresAtMs: Date.now() + AUTH_OTP_TTL_MS,
+      });
+      sendAutoSignal(from, "connect_otp_required", { request_id: requestId });
+      setRtStatus(`OTP generated for ${label}: ${otp} (expires in ${Math.floor(AUTH_OTP_TTL_MS / 1000)}s)`);
+      window.alert(
+        [
+          `One-time code for ${label}: ${otp}`,
+          "",
+          "Share this code with the requester.",
+          `This code expires in ${Math.floor(AUTH_OTP_TTL_MS / 1000)} seconds.`,
+        ].join("\n"),
+      );
+      renderPeers();
+      return;
+    }
+
+    denyConnectRequest(from, requestId, "rejected_by_user");
+    setRtStatus(`authorization rejected for ${label}`);
+  }
+
+  async function handleIncomingOtpRequired(from, payload) {
+    const requestId = parseSignalRequestId(payload);
+    const pending = getPendingRequest(from);
+    if (!pending || pending.requestId !== requestId) return;
+    pending.waitingOtp = true;
+    state.auto.pendingRequests.set(from, pending);
+    renderPeers();
+
+    const peer = state.auto.peers.get(from);
+    const label = peerDisplayName(peer);
+    const entered = parseOtpCode(
+      window.prompt(`Enter the 6-digit one-time code displayed on ${label}:`, ""),
+    );
+    if (!entered) {
+      setRtStatus(`otp required by ${label}; request is still pending`);
+      setRtErr("invalid otp input; expected 6 digits");
+      return;
+    }
+    sendAutoSignal(from, "connect_otp_submit", {
+      request_id: requestId,
+      otp: entered,
+    });
+    setRtStatus(`otp submitted to ${label}; waiting for approval`);
+  }
+
+  async function handleIncomingOtpSubmit(from, payload) {
+    const requestId = parseSignalRequestId(payload);
+    const otp = parseOtpCode(payload && payload.otp);
+    const challenge = state.auto.otpChallenges.get(from);
+    if (!challenge || challenge.requestId !== requestId) {
+      denyConnectRequest(from, requestId, "otp_not_requested");
+      return;
+    }
+    if (Date.now() >= Number(challenge.expiresAtMs || 0)) {
+      state.auto.otpChallenges.delete(from);
+      denyConnectRequest(from, requestId, "otp_expired");
+      return;
+    }
+    if (!otp || otp !== challenge.otp) {
+      denyConnectRequest(from, requestId, "otp_invalid");
+      return;
+    }
+
+    grantPeerAuthorization(from, requestId, "otp");
+    sendAutoSignal(from, "connect_grant", { request_id: requestId, mode: "otp" });
+    setRtStatus(`otp verified for ${peerDisplayName(state.auto.peers.get(from))}; waiting for offer`);
+    renderPeers();
+  }
+
+  async function handleIncomingConnectGrant(from, payload) {
+    const requestId = parseSignalRequestId(payload);
+    const pending = getPendingRequest(from);
+    if (!pending || pending.requestId !== requestId) return;
+    state.auto.pendingRequests.delete(from);
+
+    const mode = payload && payload.mode === "otp" ? "otp" : "allow";
+    grantPeerAuthorization(from, requestId, mode);
+    setRtStatus(`authorization granted by ${from.slice(0, 8)} (${mode}); establishing session`);
+    renderPeers();
+
+    await connectAutoPeer(from, false, { forceRelay: !!pending.forceRelay });
+  }
+
+  function handleIncomingConnectReject(from, payload) {
+    const requestId = parseSignalRequestId(payload);
+    const pending = getPendingRequest(from);
+    if (pending && pending.requestId === requestId) {
+      state.auto.pendingRequests.delete(from);
+    }
+    clearPeerAuthorizationState(from);
+    const reason = payload && typeof payload.reason === "string" ? payload.reason : "rejected";
+    setRtErr(`connection request rejected by ${from.slice(0, 8)}: ${reason}`);
+    renderPeers();
+  }
+
   async function drainPendingIce(session) {
     if (!session.pendingIce || session.pendingIce.length === 0) return;
     const items = session.pendingIce.splice(0, session.pendingIce.length);
@@ -1340,6 +1604,9 @@
   async function connectAutoPeer(peerId, manual, opts) {
     if (!peerId) throw new Error("select a peer first");
     if (!state.auto.running) throw new Error("auto-discovery is not running");
+    if (!hasPeerGrant(peerId)) {
+      throw new Error("connection is not authorized; send request and wait for peer approval");
+    }
     const forceRelay = !!(opts && opts.forceRelay);
     const existing = getSession(peerId);
     if (existing && forceRelay && !existing.turnForced) {
@@ -1373,6 +1640,35 @@
 
   async function onAutoSignal(from, kind, payload) {
     if (!from || typeof from !== "string") return;
+    if (!kind || typeof kind !== "string") return;
+
+    if (kind === "connect_request") {
+      await handleIncomingConnectRequest(from, payload || null);
+      return;
+    }
+    if (kind === "connect_otp_required") {
+      await handleIncomingOtpRequired(from, payload || null);
+      return;
+    }
+    if (kind === "connect_otp_submit") {
+      await handleIncomingOtpSubmit(from, payload || null);
+      return;
+    }
+    if (kind === "connect_grant") {
+      await handleIncomingConnectGrant(from, payload || null);
+      return;
+    }
+    if (kind === "connect_reject") {
+      handleIncomingConnectReject(from, payload || null);
+      return;
+    }
+
+    if ((kind === "offer" || kind === "answer" || kind === "ice") && !hasRtcAuthorization(from)) {
+      denyConnectRequest(from, "", "authorization_required");
+      setRtStatus(`blocked unauthorized rtc signal from ${from.slice(0, 8)}`);
+      return;
+    }
+
     const session = await createAutoSession(from);
 
     if (kind === "offer") {
@@ -1522,8 +1818,8 @@
           if (!sp) continue;
           state.auto.peers.set(sp.id, sp);
         }
+        reconcileAuthWithPeerList();
         renderPeers();
-        maybeAutoConnectAny();
         return;
       }
 
@@ -1535,8 +1831,8 @@
           if (!sp) continue;
           state.auto.peers.set(sp.id, sp);
         }
+        reconcileAuthWithPeerList();
         renderPeers();
-        maybeAutoConnectAny();
         return;
       }
 
@@ -1544,8 +1840,8 @@
         const sp = sanitizePeer(msg.peer);
         if (sp) {
           state.auto.peers.set(sp.id, sp);
+          reconcileAuthWithPeerList();
           renderPeers();
-          maybeAutoConnectPeer(sp.id);
         }
         return;
       }
@@ -1568,6 +1864,7 @@
         const peerId = typeof msg.peer_id === "string" ? msg.peer_id : "";
         if (!peerId) return;
         closeAutoSession(peerId, false);
+        reconcileAuthWithPeerList();
         renderPeers();
         return;
       }
@@ -1605,34 +1902,6 @@
       state.auto.ws = null;
     }
     closeAllAutoSessions();
-  }
-
-  function shouldAutoDial(peerId) {
-    if (!peerId || peerId === state.auto.selfId) return false;
-    if (!state.auto.selfId) return false;
-    return state.auto.selfId > peerId;
-  }
-
-  function maybeAutoConnectPeer(peerId) {
-    if (!state.auto.running || state.mode !== "auto") return;
-    if (!shouldAutoDial(peerId)) return;
-    const existing = getSession(peerId);
-    if (existing) {
-      const st = sessionConnectionState(existing);
-      if (st !== "failed" && st !== "closed") return;
-    }
-    connectAutoPeer(peerId, false).catch(() => {
-      // ignore auto connect failures; user can connect manually.
-    });
-  }
-
-  function maybeAutoConnectAny() {
-    const peers = Array.from(state.auto.peers.values())
-      .map((p) => p.id)
-      .filter((id) => !!id && id !== state.auto.selfId);
-    for (const id of peers) {
-      maybeAutoConnectPeer(id);
-    }
   }
 
   function startAutoDiscovery() {
@@ -2009,6 +2278,9 @@
     if (session && session.dc && session.dc.readyState === "open") {
       return session;
     }
+    if (!hasPeerGrant(peerId)) {
+      throw new Error("connection is not authorized yet. send request and wait for peer approval");
+    }
 
     await connectAutoPeer(peerId, false, { forceRelay: false });
     try {
@@ -2190,9 +2462,9 @@
       connectBtn.onclick = async () => {
         setRtErr("");
         try {
-          await connectAutoPeer(state.auto.selectedPeerId, true);
+          await requestAutoConnect(state.auto.selectedPeerId, { forceRelay: false });
         } catch (e) {
-          setRtErr(e && e.message ? e.message : "connect failed");
+          setRtErr(e && e.message ? e.message : "request failed");
         }
       };
     }

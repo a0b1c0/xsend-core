@@ -76,7 +76,7 @@ Browser "dual-mode" shape (Auto-Discovery + Offline Mode) design is documented i
 
 Public page now also includes a no-login "Quick Link" section:
 
-- Auto-Discovery: same-WiFi peers auto-discover and WebRTC-connect
+- Auto-Discovery: same-WiFi peers auto-discover, but session setup requires explicit request + receiver authorization (allow click or one-time 6-digit OTP) before WebRTC signaling/data channel is allowed
 - Offline Mode: local offer/answer code flow with QR generate/scan helpers
 
 ## Desktop (Tauri 2)

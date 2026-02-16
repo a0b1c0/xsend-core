@@ -2525,7 +2525,7 @@ export default {
           public_ip_hint: maskIp(ip),
           scope: scope || null,
           ws_path: "/api/v1/realtime/auto/ws",
-          notes: "Clients with the same public IP and same scope join the same signaling room.",
+          notes: "Clients with the same public IP and same scope join the same signaling room. Session setup requires explicit requester/receiver authorization.",
         });
       }
 

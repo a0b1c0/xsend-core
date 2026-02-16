@@ -122,7 +122,7 @@ Signal messages:
   - `{ "type": "ping" }`
   - `{ "type": "list" }`
   - `{ "type": "meta", "name": "Alice" }`
-  - `{ "type": "signal", "to": "<peer_id>", "kind": "offer|answer|ice", "payload": {...} }`
+  - `{ "type": "signal", "to": "<peer_id>", "kind": "connect_request|connect_otp_required|connect_otp_submit|connect_grant|connect_reject|offer|answer|ice", "payload": {...} }`
 - Server -> client:
   - `welcome`, `peers`, `peer_join`, `peer_leave`, `peer_update`, `signal`, `pong`, `error`
 
@@ -130,7 +130,7 @@ Offline mode note:
 
 - The fully offline QR/scan mode is a browser-side flow and does not require these endpoints.
 - Public page (`/`) includes "Quick Link (No Login)" with:
-  - Auto-Discovery peer list + one-click file send over WebRTC DataChannel
+  - Auto-Discovery peer list with explicit request/authorization handshake before WebRTC session setup
   - Offline offer/answer code flow (supports `XSO3` shard codes + QR part scan stitching)
   - Fingerprint confirmation before sending files (first-connection anti-MITM check)
   - Auto route fallback policy: P2P -> TURN (forced relay ICE) -> Relay upload (signed-in users)

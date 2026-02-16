@@ -291,7 +291,7 @@
         <div class="body">
           <div class="err" id="rtErr"></div>
           <div class="muted">
-            Same WiFi: open this page on both devices and it will auto-discover. Offline mode uses local offer/answer code with optional QR scan, fingerprint verification, and shard-aware QR stitching.
+            Same WiFi: open this page on both devices to auto-discover peers. Session setup requires an explicit connection request and peer-side authorization (allow click or one-time 6-digit OTP). Offline mode uses local offer/answer code with optional QR scan, fingerprint verification, and shard-aware QR stitching.
           </div>
           <div style="height: 10px"></div>
           <div class="mode-switch">
@@ -323,7 +323,7 @@
               <button id="rtStartAuto" class="primary">Start</button>
               <button id="rtStopAuto" class="danger">Stop</button>
               <button id="rtRefreshPeers">Refresh peers</button>
-              <button id="rtConnectPeer" class="primary">Connect selected</button>
+              <button id="rtConnectPeer" class="primary">Request selected</button>
               <button id="rtDisconnectPeer" class="danger">Disconnect selected</button>
             </div>
 
