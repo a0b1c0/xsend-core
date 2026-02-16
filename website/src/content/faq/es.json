@@ -1,0 +1,16 @@
+{
+    "questions": [
+        {
+            "q": "¿Es xSend completamente gratuito?",
+            "a": "Sí, la funcionalidad principal P2P es de código abierto y gratuita. El servicio opcional Cloud Relay tiene un nivel gratuito para archivos pequeños."
+        },
+        {
+            "q": "¿xSend almacena mis archivos?",
+            "a": "No. En el modo directo (LAN), los archivos van directamente del dispositivo A al dispositivo B. Nunca los vemos. Si usa Cloud Relay, los archivos se almacenan en caché temporalmente (cifrados) y se eliminan después de 7 días."
+        },
+        {
+            "q": "¿Qué plataformas son compatibles?",
+            "a": "Windows, macOS y Linux son totalmente compatibles. El soporte para Android e iOS está disponible actualmente a través de la interfaz web."
+        }
+    ]
+}

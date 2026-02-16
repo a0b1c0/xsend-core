@@ -1,0 +1,62 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { languages, ui, defaultLang } from '../../i18n/ui';
+
+export async function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({ params: { lang } }));
+}
+
+const { lang } = Astro.params;
+const t = ui[lang as keyof typeof ui] || ui[defaultLang];
+---
+
+<BaseLayout title={`xSend - ${t['hero.title']}`} lang={lang}>
+  <Header lang={lang} />
+  
+  <main>
+    {/* Hero Section */}
+    <section class="relative pt-20 pb-32 overflow-hidden">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+        <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-6">
+          {t['hero.title']}
+        </h1>
+        <p class="text-xl md:text-2xl text-slate-600 dark:text-slate-300 mb-10 max-w-3xl mx-auto">
+          {t['hero.desc']}
+        </p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <a href="#download" class="inline-flex items-center justify-center px-8 py-4 text-base font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-1">
+            {t['hero.cta']}
+          </a>
+          <a href={`/${lang}/blog`} class="inline-flex items-center justify-center px-8 py-4 text-base font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl transition-all">
+            Read Docs
+          </a>
+        </div>
+      </div>
+      
+      {/* Abstract Background Decoration */}
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-emerald-500/20 dark:bg-emerald-500/10 blur-[100px] rounded-full -z-10"></div>
+    </section>
+
+    {/* Features Grid */}
+    <section class="py-24 bg-slate-50 dark:bg-slate-900/50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid md:grid-cols-3 gap-8">
+          {[
+            { title: t['features.secure'], icon: '🛡️', desc: 'ChaCha20Poly1305 encryption assures your data is for your eyes only.' },
+            { title: t['features.fast'], icon: '⚡', desc: 'Saturates your LAN bandwidth. No cloud bottlenecks.' },
+            { title: t['features.private'], icon: '🔒', desc: 'Direct P2P connection. We never see your files.' },
+          ].map(f => (
+            <div class="p-8 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+              <div class="text-4xl mb-4">{f.icon}</div>
+              <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">{f.title}</h3>
+              <p class="text-slate-600 dark:text-slate-400">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+  <Footer lang={lang} />
+</BaseLayout>

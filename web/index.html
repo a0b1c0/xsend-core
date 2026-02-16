@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>xsend</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --panel: #11182a;
+      --text: #e7ecf5;
+      --muted: #9aa6bd;
+      --accent: #59f3a6;
+      --bad: #ff5c7a;
+      --warn: #ffce5c;
+      --line: rgba(231, 236, 245, 0.12);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+        "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: radial-gradient(1200px 600px at 20% -10%, rgba(89, 243, 166, 0.25), transparent),
+        radial-gradient(1000px 700px at 100% 0%, rgba(92, 130, 255, 0.22), transparent),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+    }
+
+    .wrap {
+      max-width: 1050px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+
+    .top {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0.2px;
+    }
+
+    .badge {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 420px 1fr;
+      }
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(17, 24, 42, 0.95), rgba(17, 24, 42, 0.7));
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+
+    .card h2 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 14px;
+    }
+
+    .card .body {
+      padding: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    input,
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      border-radius: 10px;
+      border: 1px solid rgba(231, 236, 245, 0.16);
+      background: rgba(7, 10, 18, 0.8);
+      color: var(--text);
+      padding: 10px 12px;
+      font-family: var(--mono);
+      outline: none;
+    }
+
+    input::placeholder {
+      color: rgba(154, 166, 189, 0.65);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    @media (min-width: 520px) {
+      .row.two {
+        grid-template-columns: 1fr 140px;
+      }
+    }
+
+    button {
+      cursor: pointer;
+      border-radius: 10px;
+      border: 1px solid rgba(231, 236, 245, 0.16);
+      background: rgba(7, 10, 18, 0.6);
+      color: var(--text);
+      padding: 10px 12px;
+      font-family: var(--sans);
+      font-weight: 600;
+    }
+
+    button.primary {
+      border-color: rgba(89, 243, 166, 0.45);
+      background: rgba(89, 243, 166, 0.12);
+    }
+
+    button.danger {
+      border-color: rgba(255, 92, 122, 0.5);
+      background: rgba(255, 92, 122, 0.12);
+    }
+
+    button.small {
+      padding: 7px 10px;
+      font-size: 12px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .err {
+      color: var(--bad);
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 6px 10px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .kv .k {
+      color: var(--muted);
+    }
+
+    .jobs {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .job {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(7, 10, 18, 0.35);
+    }
+
+    .job .head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .job .id {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .job .status {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(231, 236, 245, 0.16);
+    }
+
+    .status.running {
+      border-color: rgba(89, 243, 166, 0.5);
+      color: var(--accent);
+    }
+
+    .status.completed {
+      border-color: rgba(89, 243, 166, 0.25);
+      color: rgba(89, 243, 166, 0.8);
+    }
+
+    .status.failed {
+      border-color: rgba(255, 92, 122, 0.6);
+      color: var(--bad);
+    }
+
+    .status.paused {
+      border-color: rgba(255, 206, 92, 0.6);
+      color: var(--warn);
+    }
+
+    .status.canceled {
+      border-color: rgba(154, 166, 189, 0.35);
+      color: rgba(154, 166, 189, 0.95);
+    }
+
+    .job .path {
+      font-family: var(--mono);
+      font-size: 12px;
+      word-break: break-all;
+    }
+
+    .bar {
+      height: 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(231, 236, 245, 0.12);
+      overflow: hidden;
+      background: rgba(7, 10, 18, 0.55);
+      margin-top: 8px;
+    }
+
+    .bar>div {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, rgba(89, 243, 166, 0.8), rgba(92, 130, 255, 0.7));
+    }
+
+    .job .foot {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .job .meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .picker-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 9999;
+    }
+
+    .picker-backdrop.show {
+      display: flex;
+    }
+
+    .picker {
+      width: min(900px, 100%);
+      max-height: min(720px, 90vh);
+      background: linear-gradient(180deg, rgba(17, 24, 42, 0.98), rgba(17, 24, 42, 0.85));
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 16px 60px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .picker .head {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .picker .title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    .picker .controls {
+      display: flex;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .picker .path {
+      flex: 1;
+      min-width: 260px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--muted);
+      padding: 8px 10px;
+      border: 1px solid rgba(231, 236, 245, 0.16);
+      border-radius: 10px;
+      background: rgba(7, 10, 18, 0.55);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .picker .list {
+      padding: 10px 14px 14px;
+      overflow: auto;
+      flex: 1;
+    }
+
+    .picker .item {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 9px 10px;
+      border: 1px solid rgba(231, 236, 245, 0.12);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      background: rgba(7, 10, 18, 0.28);
+    }
+
+    .picker .item:hover {
+      border-color: rgba(89, 243, 166, 0.45);
+      background: rgba(7, 10, 18, 0.42);
+    }
+
+    .picker .name {
+      font-family: var(--mono);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 70%;
+    }
+
+    .picker .hint {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: rgba(154, 166, 189, 0.9);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>xsend daemon</h1>
+      <div class="badge" id="version">v?</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Control</h2>
+        <div class="body">
+          <div class="muted" style="margin-bottom: 8px">
+            Cloud relay (file transfer station): sign in once, then upload by selecting a local
+            file path. No code is needed.
+          </div>
+
+          <div class="kv">
+            <div class="k">relay base</div>
+            <div id="relayBase">-</div>
+            <div class="k">cloud UI</div>
+            <div id="relayCloudLink">-</div>
+          </div>
+
+          <div style="height: 10px"></div>
+
+          <div class="row two">
+            <div>
+              <label for="relayIdent">Username or email</label>
+              <input id="relayIdent" placeholder="you@example.com" />
+            </div>
+            <div>
+              <label for="relayPassword">Password</label>
+              <input id="relayPassword" type="password" placeholder="********" />
+            </div>
+          </div>
+
+          <div style="height: 10px"></div>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <button id="relayLogin" class="primary">Sign in</button>
+            <button id="relayRegister" class="small">Create account</button>
+            <button id="relayLogout" class="small danger">Sign out</button>
+          </div>
+
+          <div style="height: 10px"></div>
+          <div class="muted" id="relayStatus">-</div>
+
+          <div style="height: 10px"></div>
+          <div class="kv">
+            <div class="k">plan</div>
+            <div id="relayPlan">-</div>
+            <div class="k">today usage</div>
+            <div id="relayUsageToday">-</div>
+            <div class="k">month usage</div>
+            <div id="relayBillingMonth">-</div>
+            <div class="k">estimated cost</div>
+            <div id="relayBillingEstimate">-</div>
+            <div class="k">turn status</div>
+            <div id="relayTurnStatus">-</div>
+          </div>
+          <div style="height: 8px"></div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <button id="relayTurnCheck" class="small">Check TURN</button>
+          </div>
+
+          <div style="height: 14px"></div>
+
+          <div class="row">
+            <div>
+              <label for="relayPath">Local file/folder path (limits are applied by your current relay plan)</label>
+              <input id="relayPath" placeholder="/Users/you/Downloads/file.bin" />
+            </div>
+          </div>
+
+          <div style="height: 8px"></div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap">
+            <button id="relayPathBrowse" class="small">Browse local path</button>
+            <button id="relayUploadPath" class="primary">Upload file/folder</button>
+          </div>
+
+          <div style="height: 14px"></div>
+          <div class="muted" style="margin-bottom: 8px">
+            Relay E2EE (end-to-end encryption). Pair two devices once to share the same relay key.
+          </div>
+          <div class="kv">
+            <div class="k">channel code</div>
+            <div id="relayE2eeChannel">-</div>
+            <div class="k">key status</div>
+            <div id="relayE2eeHasKey">-</div>
+            <div class="k">fingerprint</div>
+            <div id="relayE2eeFp">-</div>
+          </div>
+
+          <div style="height: 10px"></div>
+          <div class="row two">
+            <div>
+              <label for="relayPairCode">Pair code (6 digits)</label>
+              <input id="relayPairCode" placeholder="123456" inputmode="numeric" />
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button id="relayPairStart" class="small">Start pair (receive)</button>
+                <button id="relayPairSend" class="small">Send key</button>
+                <button id="relayPairAccept" class="small">Accept key</button>
+              </div>
+            </div>
+          </div>
+          <div style="height: 8px"></div>
+          <div class="muted" id="relayPairHint">-</div>
+
+          <div style="height: 12px"></div>
+
+          <details>
+            <summary class="muted" style="cursor: pointer">Cloud files (advanced)</summary>
+            <div style="height: 12px"></div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+              <button id="relayListRefresh" class="small">Refresh list</button>
+              <button id="relayPullAll" class="small">Pull all to this computer</button>
+            </div>
+            <div style="height: 10px"></div>
+            <div class="jobs" id="relayFilesList"></div>
+          </details>
+
+          <div style="height: 12px"></div>
+
+          <details>
+            <summary class="muted" style="cursor: pointer">LAN direct (advanced)</summary>
+            <div style="height: 12px"></div>
+
+            <div class="kv">
+              <div class="k">daemon id</div>
+              <div id="daemonId">?</div>
+              <div class="k">lan port</div>
+              <div id="lanPort">?</div>
+              <div class="k">lan endpoints</div>
+              <div id="lanEndpoints">?</div>
+              <div class="k">wan quic port</div>
+              <div id="wanPort">?</div>
+              <div class="k">wan endpoints</div>
+              <div id="wanEndpoints">?</div>
+            </div>
+
+            <div style="height: 10px"></div>
+
+            <div class="row">
+              <button id="createReceive" class="primary">Create receive code</button>
+            </div>
+
+            <div style="height: 10px"></div>
+
+            <div class="kv">
+              <div class="k">receive code</div>
+              <div id="receiveCode">-</div>
+              <div class="k">expires</div>
+              <div id="receiveExpires">-</div>
+            </div>
+
+            <div style="height: 10px"></div>
+
+            <div class="row two">
+              <div>
+                <label for="receiveCodeInput">Or enter a code to receive</label>
+                <input id="receiveCodeInput" placeholder="123456" inputmode="numeric" />
+              </div>
+              <div>
+                <label>&nbsp;</label>
+                <button id="openReceive" class="primary">Receive</button>
+              </div>
+            </div>
+
+            <div style="height: 10px"></div>
+
+            <div class="row two">
+              <div>
+                <label for="sendAddr">Receiver addr (ip:port)</label>
+                <input id="sendAddr" placeholder="192.168.1.10:54321" />
+              </div>
+              <div>
+                <label for="sendCode">Code</label>
+                <input id="sendCode" placeholder="123456" />
+              </div>
+            </div>
+
+            <div style="height: 10px"></div>
+
+            <div class="row">
+              <div>
+                <label for="sendPath">Absolute file path</label>
+                <input id="sendPath" placeholder="/Users/you/Downloads/bigfile.bin" />
+              </div>
+            </div>
+
+            <div style="height: 8px"></div>
+            <div class="row">
+              <button id="sendBrowse" class="small">Browse local files</button>
+            </div>
+
+            <div style="height: 10px"></div>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap">
+              <button id="sendBtn" class="primary">Send (manual addr)</button>
+              <button id="sendWanBtn" class="primary">Send WAN (QUIC)</button>
+              <button id="sendAutoBtn" class="primary">Send (auto discover)</button>
+            </div>
+
+            <div style="height: 10px"></div>
+            <div class="muted" style="display:flex; gap:14px; flex-wrap:wrap; align-items:center;">
+              <label style="display:flex; gap:6px; align-items:center; margin:0;">
+                <input id="sendAutoRelayOnFail" type="checkbox" checked />
+                auto relay fallback on fail
+              </label>
+              <label style="display:flex; gap:6px; align-items:center; margin:0;">
+                <input id="sendTurnAccel" type="checkbox" />
+                TURN preflight (optional)
+              </label>
+            </div>
+
+            <div style="height: 10px"></div>
+
+            <div class="kv">
+              <div class="k">discovered peers</div>
+              <div id="peersList">-</div>
+            </div>
+          </details>
+
+          <div style="height: 12px"></div>
+
+          <details>
+            <summary class="muted" style="cursor: pointer">Local hash job (debug)</summary>
+            <div style="height: 12px"></div>
+            <div class="row two">
+              <div>
+                <label for="path">Absolute file path</label>
+                <input id="path" placeholder="/Users/you/Downloads/bigfile.bin" />
+              </div>
+              <div>
+                <label for="network">Network</label>
+                <select id="network">
+                  <option value="lan">lan</option>
+                  <option value="wan">wan</option>
+                </select>
+              </div>
+            </div>
+            <div style="height: 8px"></div>
+            <div class="row">
+              <button id="pathBrowse" class="small">Browse local files</button>
+            </div>
+            <div style="height: 10px"></div>
+            <div class="row">
+              <button id="create" class="small">Create hash job</button>
+            </div>
+            <div style="height: 10px"></div>
+            <div class="muted">
+              Placeholder: reads the local file in 2MiB chunks, computes per-chunk BLAKE3 and a
+              final file BLAKE3.
+            </div>
+          </details>
+
+          <div style="height: 10px"></div>
+          <div id="err" class="err"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Status</h2>
+        <div class="body">
+          <div class="kv">
+            <div class="k">running jobs</div>
+            <div id="runningJobs">?</div>
+            <div class="k">queued jobs</div>
+            <div id="queuedJobs">?</div>
+            <div class="k">running streams</div>
+            <div id="runningStreams">?</div>
+            <div class="k">limits</div>
+            <div id="limits">?</div>
+          </div>
+
+          <div style="height: 14px"></div>
+
+          <div class="muted" style="margin-bottom: 8px">Transfers</div>
+          <div class="jobs" id="transfers"></div>
+
+          <div style="height: 14px"></div>
+
+          <div class="muted" style="margin-bottom: 8px">Hash jobs</div>
+          <div class="jobs" id="jobs"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+
+  <div class="picker-backdrop" id="pickerBackdrop">
+    <div class="picker">
+      <div class="head">
+        <div class="title">Select a file</div>
+        <button id="pickerClose" class="small">Close</button>
+      </div>
+      <div class="controls">
+        <button id="pickerUp" class="small">Up</button>
+        <button id="pickerHome" class="small">Roots</button>
+        <div class="path" id="pickerPath">-</div>
+      </div>
+      <div class="list" id="pickerList"></div>
+    </div>
+  </div>
+</body>
+
+</html>

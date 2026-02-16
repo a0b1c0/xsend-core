@@ -1,0 +1,34 @@
+---
+// Redirect to default language or detect user language
+import { defaultLang, languages } from '../i18n/ui';
+
+// This is a static page that will run client-side redirection
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content={`0;url=/${defaultLang}/`} />
+  <script is:inline define:vars={{ defaultLang, languages }}>
+    // Client-side language detection
+    try {
+      const userLang = navigator.language || navigator.userLanguage;
+      const langCode = userLang.split('-')[0];
+      
+      // Check if we support this language
+      if (languages[langCode]) {
+        window.location.href = `/${langCode}/`;
+      } else {
+        window.location.href = `/${defaultLang}/`;
+      }
+    } catch (e) {
+      // Fallback
+      window.location.href = `/${defaultLang}/`;
+    }
+  </script>
+</head>
+<body>
+  <p>Redirecting to <a href={`/${defaultLang}/`}>/${defaultLang}/</a>...</p>
+</body>
+</html>

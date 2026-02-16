@@ -1,0 +1,82 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Header from '../../../components/Header.astro';
+import Footer from '../../../components/Footer.astro';
+import { getCollection } from 'astro:content';
+import { languages, ui, defaultLang } from '../../../i18n/ui';
+
+export async function getStaticPaths() {
+  return Object.keys(languages).map((lang) => ({ params: { lang } }));
+}
+
+const { lang } = Astro.params;
+const t = ui[lang as keyof typeof ui] || ui[defaultLang];
+
+// Fetch posts and filter by current language
+// Expected structure: src/content/blog/{lang}/{slug}.md
+// Collection ID will be "{lang}/{slug}"
+const allPosts = await getCollection('blog');
+const posts = allPosts.filter((post) => {
+  const [postLang] = post.id.split('/');
+  return postLang === lang;
+}).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+---
+
+<BaseLayout title={`Blog - xSend`} lang={lang}>
+  <Header lang={lang} />
+  
+  <main class="py-16 bg-slate-50 dark:bg-slate-900/50 min-h-screen">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-16">
+        <h1 class="text-4xl font-extrabold text-slate-900 dark:text-white mb-4">
+          xSend Blog
+        </h1>
+        <p class="text-lg text-slate-600 dark:text-slate-400">
+          Updates, tutorials, and technical deep dives.
+        </p>
+      </div>
+
+      <div class="grid gap-8">
+        {posts.length > 0 ? (
+          posts.map((post) => {
+             // Extract slug without lang prefix
+             const slug = post.id.split('/').slice(1).join('/');
+             return (
+              <article class="bg-white dark:bg-slate-800 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow border border-slate-100 dark:border-slate-700">
+                <div class="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 mb-4">
+                  <time datetime={post.data.pubDate.toISOString()}>
+                    {post.data.pubDate.toLocaleDateString(lang, { year: 'numeric', month: 'long', day: 'numeric' })}
+                  </time>
+                  <span>•</span>
+                  <span>{post.data.author}</span>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-3">
+                  <a href={`/${lang}/blog/${slug}`} class="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
+                    {post.data.title}
+                  </a>
+                </h2>
+                <p class="text-slate-600 dark:text-slate-300 mb-6">
+                  {post.data.description}
+                </p>
+                <a href={`/${lang}/blog/${slug}`} class="font-medium text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 inline-flex items-center gap-1">
+                  Read more
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </a>
+              </article>
+            );
+          })
+        ) : (
+          <div class="text-center py-12 text-slate-500 bg-white dark:bg-slate-800 rounded-xl">
+            <p>No posts available in {languages[lang as keyof typeof languages]} yet.</p>
+            {lang !== 'en' && (
+              <a href="/en/blog" class="mt-2 inline-block text-emerald-600 hover:underline">
+                Read in English
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  </main>
+  <Footer lang={lang} />
+</BaseLayout>
