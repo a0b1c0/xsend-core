@@ -1,6 +1,6 @@
 [package]
 name = "xsend-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "xSend desktop (Tauri 2)"
 authors = ["xsend"]
 edition = "2024"
