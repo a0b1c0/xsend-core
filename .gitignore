@@ -3,3 +3,4 @@ target/
 node_modules/
 .wrangler/
 desktop/src-tauri/gen/
+clients/desktop/src-tauri/gen/

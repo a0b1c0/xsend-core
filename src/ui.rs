@@ -23,7 +23,7 @@ pub async fn index(State(state): State<AppState>) -> impl IntoResponse {
         .parse()
         .unwrap(),
     );
-    (headers, include_str!("../web/index.html"))
+    (headers, include_str!("../tools/debug-web/index.html"))
 }
 
 pub async fn app_js() -> impl IntoResponse {
@@ -33,5 +33,5 @@ pub async fn app_js() -> impl IntoResponse {
         "text/javascript; charset=utf-8".parse().unwrap(),
     );
     headers.insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
-    (headers, include_str!("../web/app.js"))
+    (headers, include_str!("../tools/debug-web/app.js"))
 }
